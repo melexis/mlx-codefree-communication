@@ -1,4 +1,4 @@
-name: C/C++ Style Check (Clang-Format)
+name: C CI Pipeline
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   formatting-check:
+    name: Formatting Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -18,6 +19,7 @@ jobs:
           check-path: 'mlx-codefree-communication'
 
   unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
     defaults:
       run:
