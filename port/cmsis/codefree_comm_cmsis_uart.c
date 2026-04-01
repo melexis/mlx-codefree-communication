@@ -88,8 +88,7 @@ bool codefree_comm_ext_initDriver(void) {
   return retVal;
 }
 
-bool
-codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg) {
+bool codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg) {
   ARM_DRIVER_USART *usartDrv =
       &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
   bool retVal = true;
@@ -114,8 +113,8 @@ codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg) {
   return retVal;
 }
 
-bool
-codefree_comm_ext_sendReadRequest(CodefreeCommReadMessage_t *readMsgStruct) {
+bool codefree_comm_ext_sendReadRequest(
+    CodefreeCommReadMessage_t *readMsgStruct) {
   ARM_DRIVER_USART *usartDrv =
       &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
   bool retVal = true;
