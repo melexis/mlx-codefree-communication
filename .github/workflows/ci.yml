@@ -6,9 +6,18 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
   formatting-check:
-    name: Formatting Check
+    name: Stylecheck
     runs-on: ubuntu-latest
     steps:
       # 1. Clone repository
@@ -21,33 +30,6 @@ jobs:
         with:
           clang-format-version: '14'
           check-path: 'mlx-codefree-communication'
-
-  generate-docs:
-    name: Generate Documentation
-    runs-on: ubuntu-latest
-    steps:
-      # 1. Clone repository
-      - name: Clone
-        uses: actions/checkout@v4
-
-      # 2. Install necessary packages
-      - name: Install Doxygen and Graphviz
-        run: |
-          sudo apt-get update
-          # Graphviz is optional, but it allows Doxygen to draw cool call-graphs!
-          sudo apt-get install -y doxygen graphviz 
-
-      # 3. Generate documentation
-      - name: Run Doxygen
-        run: doxygen Doxyfile
-
-      # 4. Upload documentation artifacts
-      - name: Upload Documentation Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Doxygen-HTML-Docs
-          path: html/
-          retention-days: 14
 
   unit-tests:
     name: Unit Tests
@@ -67,3 +49,47 @@ jobs:
       # 3. Run tests
       - name: Run Unit Tests
         run: ceedling test:all
+
+  generate-docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    # Only deploy the website when code is merged/pushed directly to main, 
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [formatting-check, unit-tests] 
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # 1. Clone repository
+      - name: Clone
+        uses: actions/checkout@v4
+
+      # 2. Install necessary packages
+      - name: Install Doxygen and Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      # 3. Generate doxy output
+      - name: Run Doxygen
+        run: doxygen Doxyfile
+
+      # 4. nojekyll file for dir name compatibility
+      - name: Add .nojekyll file
+        run: touch html/.nojekyll
+
+      # 5. Setup page
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      # 6. Upload generated doc
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './html'
+
+      # 7. Deploy output
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
