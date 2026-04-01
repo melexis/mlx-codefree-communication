@@ -11,11 +11,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
-      # This pre-built action automatically finds all C/C++ files and checks 
-      # them against your .clang-format file.
       - name: Run clang-format
         uses: jidicula/clang-format-action@v4.11.0
         with:
           clang-format-version: '14'
-          check-path: 'mlx-codefree-communication' # Directory to check
+          check-path: 'mlx-codefree-communication'
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./mlx-codefree-communication
+    steps:
+      # 1. Clone repository
+      - name: Clone
+        uses: actions/checkout@v4
+
+      # 2. Install Ceedling to run tests (using ruby)
+      - name: Install Ceedling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby
+          gem install ceedling
+
+      # 3. Run tests
+      - name: Run Unit Tests
+        run: ceedling test:all
