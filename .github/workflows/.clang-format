@@ -1,0 +1,38 @@
+---
+BasedOnStyle: LLVM
+
+# Language specific overrides
+Language: Cpp
+Standard: c++11
+
+# Indentation and Spacing
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+
+# Braces
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterControlStatement: Never # 'if (..) {' instead of wrapping
+  AfterEnum: false
+  AfterFunction: true
+  AfterStruct: false
+  AfterUnion: false
+  BeforeElse: false
+  BeforeWhile: false
+
+# Pointers and alignment
+PointerAlignment: Left
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: false
+
+# Prevent breaking embedded includes where order matters
+SortIncludes: false
+
+# Switch statement indentation
+IndentCaseLabels: true
+
+# Preprocessor directives
+IndentPPDirectives: None
+---

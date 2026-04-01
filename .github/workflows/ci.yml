@@ -1,0 +1,21 @@
+name: C/C++ Style Check (Clang-Format)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  formatting-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      # This pre-built action automatically finds all C/C++ files and checks 
+      # them against your .clang-format file.
+      - name: Run clang-format
+        uses: jidicula/clang-format-action@v4.11.0
+        with:
+          clang-format-version: '14'
+          check-path: 'mlx-codefree-communication' # Directory to check
