@@ -11,12 +11,43 @@ jobs:
     name: Formatting Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      # 1. Clone repository
+      - name: Clone
+        uses: actions/checkout@v4
+
+      # 2. Install clang-format
       - name: Run clang-format
         uses: jidicula/clang-format-action@v4.11.0
         with:
           clang-format-version: '14'
           check-path: 'mlx-codefree-communication'
+
+  generate-docs:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Clone repository
+      - name: Clone
+        uses: actions/checkout@v4
+
+      # 2. Install necessary packages
+      - name: Install Doxygen and Graphviz
+        run: |
+          sudo apt-get update
+          # Graphviz is optional, but it allows Doxygen to draw cool call-graphs!
+          sudo apt-get install -y doxygen graphviz 
+
+      # 3. Generate documentation
+      - name: Run Doxygen
+        run: doxygen Doxyfile
+
+      # 4. Upload documentation artifacts
+      - name: Upload Documentation Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Doxygen-HTML-Docs
+          path: html/
+          retention-days: 14
 
   unit-tests:
     name: Unit Tests
