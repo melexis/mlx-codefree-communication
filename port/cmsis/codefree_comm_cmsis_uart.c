@@ -42,7 +42,7 @@
 #define CODEFREE_COMM_USART_DRIVER_INSTANCE 0
 #endif
 
-extern ARM_DRIVER_USART ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
+ARM_DRIVER_USART ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
 
 #define CODEFREE_COMM_USART_BAUDRATE 2000000u
 #define CODEFREE_COMM_USART_CONFIG                                             \
@@ -59,7 +59,7 @@ static inline void codefree_comm_ext_callback(uint32_t event);
  * Public functions
  * ------------------------------------------------------------------------- */
 
-extern bool codefree_comm_ext_initDriver(void) {
+bool codefree_comm_ext_initDriver(void) {
   bool retVal = true;
   ARM_DRIVER_USART *usartDrv =
       &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
@@ -88,7 +88,7 @@ extern bool codefree_comm_ext_initDriver(void) {
   return retVal;
 }
 
-extern bool
+bool
 codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg) {
   ARM_DRIVER_USART *usartDrv =
       &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
@@ -114,7 +114,7 @@ codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg) {
   return retVal;
 }
 
-extern bool
+bool
 codefree_comm_ext_sendReadRequest(CodefreeCommReadMessage_t *readMsgStruct) {
   ARM_DRIVER_USART *usartDrv =
       &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);

@@ -36,21 +36,21 @@
  * It should put them in the correct mode (push-pull, open-drain)
  * It should connect them to the correct block (I2C, UART)
  */
-extern void codefree_comm_ext_hw_init(void);
+void codefree_comm_ext_hw_init(void);
 
 /** Application-level time hook for timeouts.
  *
  * This function is called by the library only to check for timeout on receive
  * message. It should return the current system time [ms]
  */
-extern uint32_t codefree_comm_ext_getTimeMs(void);
+uint32_t codefree_comm_ext_getTimeMs(void);
 
 /**
  * Initialize the underlying driver for communication with the 80339 device.
  *
  * @return bool true if initialization was successful, false otherwise
  */
-extern bool codefree_comm_ext_initDriver(void);
+bool codefree_comm_ext_initDriver(void);
 
 /**
  * Send the write message to the specified slave device.
@@ -59,7 +59,7 @@ extern bool codefree_comm_ext_initDriver(void);
  * @retval true write message sent successfully
  * @retval false write message sending failed
  */
-extern bool codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg);
+bool codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg);
 
 /**
  * Send a read request to the specified slave device.
@@ -71,7 +71,7 @@ extern bool codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg);
  * @retval true read request sent successfully
  * @retval false read request sending failed
  */
-extern bool
-codefree_comm_ext_sendReadRequest(CodefreeCommReadMessage_t *readMsgStruct);
+bool codefree_comm_ext_sendReadRequest(
+    CodefreeCommReadMessage_t *readMsgStruct);
 
 #endif /* CODEFREE_COMM_EXTERNAL_H_ */

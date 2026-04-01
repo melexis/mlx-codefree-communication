@@ -43,7 +43,7 @@
 #define CODEFREE_COMM_I2C_DRIVER_INSTANCE 0
 #endif
 
-extern ARM_DRIVER_I2C ARM_Driver_I2C_(CODEFREE_COMM_I2C_DRIVER_INSTANCE);
+ARM_DRIVER_I2C ARM_Driver_I2C_(CODEFREE_COMM_I2C_DRIVER_INSTANCE);
 
 /* Define standard fast mode by default (400kHz) */
 #ifndef CODEFREE_COMM_I2C_BUS_SPEED
@@ -59,7 +59,7 @@ static inline void codefree_comm_ext_callback(uint32_t event);
  * Public functions
  * ------------------------------------------------------------------------- */
 
-extern bool codefree_comm_ext_initDriver(void) {
+bool codefree_comm_ext_initDriver(void) {
   bool retVal = true;
   ARM_DRIVER_I2C *i2cDrv = &ARM_Driver_I2C_(CODEFREE_COMM_I2C_DRIVER_INSTANCE);
 
@@ -80,7 +80,7 @@ extern bool codefree_comm_ext_initDriver(void) {
   return retVal;
 }
 
-extern bool
+bool
 codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg) {
   ARM_DRIVER_I2C *i2cDrv = &ARM_Driver_I2C_(CODEFREE_COMM_I2C_DRIVER_INSTANCE);
   bool retVal = true;
@@ -106,8 +106,7 @@ codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg) {
   return retVal;
 }
 
-extern bool
-codefree_comm_ext_sendReadRequest(CodefreeCommReadMessage_t *readMsgStruct) {
+bool codefree_comm_ext_sendReadRequest(CodefreeCommReadMessage_t *readMsgStruct) {
   ARM_DRIVER_I2C *i2cDrv = &ARM_Driver_I2C_(CODEFREE_COMM_I2C_DRIVER_INSTANCE);
   bool retVal = true;
 

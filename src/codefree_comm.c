@@ -29,16 +29,6 @@
 #include "codefree_comm_config.h"
 #include "codefree_comm_external.h"
 
-#ifdef USE_CODEFREE_COMM_I2C
-#include "codefree_comm_ext_cmsis_i2c_impl.h"
-#else
-#ifdef USE_CODEFREE_COMM_UART
-#include "codefree_comm_ext_cmsis_uart_impl.h"
-#else
-#error Codefree communication should have a communication method selected in codefree_config.h
-#endif
-#endif
-
 /* ---------------------------------------------
  * Variables
  * --------------------------------------------- */
