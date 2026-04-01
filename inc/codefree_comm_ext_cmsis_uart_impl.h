@@ -27,9 +27,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "dig_io_mux_ll.h"
-#include "mlx_percfg.h" /* Required for enableUart */
-
 #include "Driver_USART.h"
 #include "codefree_comm.h"
 #include "codefree_comm_external.h"
@@ -64,25 +61,10 @@ static inline void codefree_comm_ext_callback(uint32_t event);
 static inline bool codefree_comm_ext_initDriver(void)
 {
     bool retVal = true;
-
-    #if (CODEFREE_COMM_USART_DRIVER_INSTANCE == 0)
-    enableUart(UART_INSTANCE_0);
-    dig_io_mux_set_1_4_set_output_mode(DIG_IO_MUX_IO_1_4_CTRL, DIG_IO_MUX_IO_1_4_CTRL_OEN_PUSH_PULL);
-    dig_io_mux_set_1_4_mux(DIG_IO_MUX_IO_1_4_CTRL, DIG_IO_MUX_IO_1_4_CTRL_OUT_MUX_SEL_UART0_TX);
-    dig_io_mux_set_1_5_input_enable(DIG_IO_MUX_IO_1_5_CTRL, DIG_IO_MUX_IO_1_5_CTRL_IEN_ENABLED);
-    dig_io_mux_enable_1_5_pullup_resistor(DIG_IO_MUX_IO_1_5_CTRL, DIG_IO_MUX_IO_1_5_CTRL_PUEN_ENABLED);
-    dig_io_mux_set_uart0_rx_input_mux(DIG_IO_MUX_UART0_RX_INPUT_MUX, DIG_IO_MUX_UART0_RX_INPUT_MUX_IN_MUX_SEL_IO_1_5);
-
-    #elif (CODEFREE_COMM_USART_DRIVER_INSTANCE == 1)
-    enableUart(UART_INSTANCE_1);
-    dig_io_mux_set_1_4_set_output_mode(DIG_IO_MUX_IO_1_4_CTRL, DIG_IO_MUX_IO_1_4_CTRL_OEN_PUSH_PULL);
-    dig_io_mux_set_1_4_mux(DIG_IO_MUX_IO_1_4_CTRL, DIG_IO_MUX_IO_1_4_CTRL_OUT_MUX_SEL_UART1_TX);
-    dig_io_mux_set_1_5_input_enable(DIG_IO_MUX_IO_1_5_CTRL, DIG_IO_MUX_IO_1_5_CTRL_IEN_ENABLED);
-    dig_io_mux_enable_1_5_pullup_resistor(DIG_IO_MUX_IO_1_5_CTRL, DIG_IO_MUX_IO_1_5_CTRL_PUEN_ENABLED);
-    dig_io_mux_set_uart1_rx_input_mux(DIG_IO_MUX_UART1_RX_INPUT_MUX, DIG_IO_MUX_UART1_RX_INPUT_MUX_IN_MUX_SEL_IO_1_5);
-    #endif
-
     ARM_DRIVER_USART* usartDrv = &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
+
+    codefree_comm_ext_hw_init();
+
     retVal = (usartDrv->Initialize(codefree_comm_ext_callback) == ARM_DRIVER_OK);
 
     if (retVal) {
