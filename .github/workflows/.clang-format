@@ -8,8 +8,13 @@ Standard: c++11
 # Indentation and Spacing
 IndentWidth: 4
 TabWidth: 4
-UseTab: Never
+UseTab: Always
 ColumnLimit: 120
+
+# Function headers
+AlwaysBreakAfterReturnType: None 
+AlwaysBreakAfterDefinitionReturnType: None
+PenaltyReturnTypeOnItsOwnLine: 10000
 
 # Braces
 BreakBeforeBraces: Custom
@@ -23,7 +28,7 @@ BraceWrapping:
   BeforeWhile: false
 
 # Pointers and alignment
-PointerAlignment: Left
+PointerAlignment: Right
 AlignConsecutiveAssignments: true
 AlignConsecutiveDeclarations: false
 

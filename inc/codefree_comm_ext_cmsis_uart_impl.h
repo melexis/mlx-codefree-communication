@@ -59,7 +59,7 @@ static inline void codefree_comm_ext_callback(uint32_t event);
  * Public functions
  * ------------------------------------------------------------------------- */
 
-static inline bool codefree_comm_ext_initDriver(void) {
+extern bool codefree_comm_ext_initDriver(void) {
   bool retVal = true;
   ARM_DRIVER_USART *usartDrv =
       &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
@@ -88,7 +88,7 @@ static inline bool codefree_comm_ext_initDriver(void) {
   return retVal;
 }
 
-static inline bool
+extern bool
 codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg) {
   ARM_DRIVER_USART *usartDrv =
       &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
@@ -114,7 +114,7 @@ codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg) {
   return retVal;
 }
 
-static inline bool
+extern bool
 codefree_comm_ext_sendReadRequest(CodefreeCommReadMessage_t *readMsgStruct) {
   ARM_DRIVER_USART *usartDrv =
       &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);

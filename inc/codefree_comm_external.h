@@ -50,7 +50,7 @@ extern uint32_t codefree_comm_ext_getTimeMs(void);
  *
  * @return bool true if initialization was successful, false otherwise
  */
-static inline bool codefree_comm_ext_initDriver(void);
+extern bool codefree_comm_ext_initDriver(void);
 
 /**
  * Send the write message to the specified slave device.
@@ -59,8 +59,7 @@ static inline bool codefree_comm_ext_initDriver(void);
  * @retval true write message sent successfully
  * @retval false write message sending failed
  */
-static inline bool
-codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg);
+extern bool codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg);
 
 /**
  * Send a read request to the specified slave device.
@@ -72,7 +71,7 @@ codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg);
  * @retval true read request sent successfully
  * @retval false read request sending failed
  */
-static inline bool
+extern bool
 codefree_comm_ext_sendReadRequest(CodefreeCommReadMessage_t *readMsgStruct);
 
 #endif /* CODEFREE_COMM_EXTERNAL_H_ */
