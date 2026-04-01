@@ -43,9 +43,9 @@
 #define CODEFREE_COMM_I2C_DRIVER_INSTANCE 0
 #endif
 
-ARM_DRIVER_I2C ARM_Driver_I2C_(CODEFREE_COMM_I2C_DRIVER_INSTANCE);
+extern ARM_DRIVER_I2C ARM_Driver_I2C_(CODEFREE_COMM_I2C_DRIVER_INSTANCE);
 
-/* Define standard fast mode by default (400kHz) */
+/* Define standard mode by default (100kHz) */
 #ifndef CODEFREE_COMM_I2C_BUS_SPEED
 #define CODEFREE_COMM_I2C_BUS_SPEED ARM_I2C_BUS_SPEED_STANDARD
 #endif

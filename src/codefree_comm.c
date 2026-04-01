@@ -157,16 +157,18 @@ bool codefree_comm_checkReadCrc(CodefreeCommReadMessage_t *msg) {
 }
 
 void codefree_comm_handleRxComplete(void) {
-  readInterfaceIO = codefree_comm_getReadInterfaceIO();
-  memcpy(&readInterfaceApplication->payload.raw[0],
-         &readInterfaceIO.payload.raw[0], 8);
-  readInterfaceApplication->crcCorrect =
-      codefree_comm_checkReadCrc(readInterfaceApplication);
-  codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
+  if (readInterfaceApplication != NULL) {
+    readInterfaceIO = codefree_comm_getReadInterfaceIO();
+    memcpy(&readInterfaceApplication->payload.raw[0],
+          &readInterfaceIO.payload.raw[0], 8);
+    readInterfaceApplication->crcCorrect =
+        codefree_comm_checkReadCrc(readInterfaceApplication);
+    codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
 
-  if (codefree_comm_appCallback != NULL) {
-    codefree_comm_appCallback(readInterfaceApplication,
-                              CODEFREE_COMM_EVENT_READ_COMPLETE);
+    if (codefree_comm_appCallback != NULL) {
+      codefree_comm_appCallback(readInterfaceApplication,
+                                CODEFREE_COMM_EVENT_READ_COMPLETE);
+    }
   }
 }
 
