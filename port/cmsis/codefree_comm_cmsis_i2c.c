@@ -40,7 +40,7 @@
 
 /* Define default driver instance if not provided by build system */
 #ifndef CODEFREE_COMM_I2C_DRIVER_INSTANCE
-#define CODEFREE_COMM_I2C_DRIVER_INSTANCE 0
+#pragma waring("define a CODEFREE_COMM_I2C_DRIVER_INSTANCE for the mlx codefree communication block.")
 #endif
 
 extern ARM_DRIVER_I2C ARM_Driver_I2C_(CODEFREE_COMM_I2C_DRIVER_INSTANCE);
