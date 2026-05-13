@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "build.h"
 #include "Driver_USART.h"
 #include "codefree_comm.h"
 #include "codefree_comm_external.h"
