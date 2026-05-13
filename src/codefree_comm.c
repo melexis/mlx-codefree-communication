@@ -160,7 +160,7 @@ void codefree_comm_handleRxComplete(void) {
   if (readInterfaceApplication != NULL) {
     readInterfaceIO = codefree_comm_getReadInterfaceIO();
     memcpy(&readInterfaceApplication->payload.raw[0],
-          &readInterfaceIO.payload.raw[0], 8);
+           &readInterfaceIO.payload.raw[0], 8);
     readInterfaceApplication->crcCorrect =
         codefree_comm_checkReadCrc(readInterfaceApplication);
     codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
