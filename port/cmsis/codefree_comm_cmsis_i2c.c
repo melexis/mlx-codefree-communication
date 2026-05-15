@@ -30,10 +30,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "build.h"
 #include "Driver_I2C.h"
 #include "codefree_comm.h"
 #include "codefree_comm_external.h"
+#include "codefree_comm_config.h"
 
 /* ----------------------------------------------------------------------------
  * Configuration & Macros
