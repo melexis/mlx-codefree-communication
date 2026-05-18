@@ -40,7 +40,8 @@
 
 /* Define default driver instance if not provided by build system */
 #ifndef CODEFREE_COMM_USART_DRIVER_INSTANCE
-#pragma error("define a CODEFREE_COMM_USART_DRIVER_INSTANCE for the mlx codefree communication block.")
+#pragma error(                                                                 \
+    "define a CODEFREE_COMM_USART_DRIVER_INSTANCE for the mlx codefree communication block.")
 #endif
 
 extern ARM_DRIVER_USART ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
