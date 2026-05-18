@@ -32,8 +32,8 @@
 
 #include "Driver_I2C.h"
 #include "codefree_comm.h"
-#include "codefree_comm_external.h"
 #include "codefree_comm_config.h"
+#include "codefree_comm_external.h"
 
 /* ----------------------------------------------------------------------------
  * Configuration & Macros
