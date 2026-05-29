@@ -74,4 +74,10 @@ bool codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg);
 bool codefree_comm_ext_sendReadRequest(
     CodefreeCommReadMessage_t *readMsgStruct);
 
+/**
+ * Abort any ongoing receive operation on the underlying driver.
+ * Called when a write command preempts a pending read.
+ */
+void codefree_comm_ext_abortReceive(void);
+
 #endif /* CODEFREE_COMM_EXTERNAL_H_ */

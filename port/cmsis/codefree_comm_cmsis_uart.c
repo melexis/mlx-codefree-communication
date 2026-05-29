@@ -148,6 +148,16 @@ bool codefree_comm_ext_sendReadRequest(
   return retVal;
 }
 
+void codefree_comm_ext_abortReceive(void) {
+  ARM_DRIVER_USART *usartDrv =
+      &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
+  if (usartDrv->GetStatus().rx_busy) {
+    usartDrv->Control(ARM_USART_ABORT_RECEIVE, 0);
+    usartDrv->Control(ARM_USART_CONTROL_RX, 0);
+    usartDrv->Control(ARM_USART_CONTROL_RX, 1);
+  }
+}
+
 /* ----------------------------------------------------------------------------
  * Local function implementation
  * ------------------------------------------------------------------------- */
