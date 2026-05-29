@@ -39,6 +39,7 @@ CodefreeCommStatus_t codefree_commStatus = CODEFREE_COMM_STATUS_INACTIVE;
 
 static CodefreeComm_ReadCallback_t codefree_comm_appCallback = NULL;
 static uint32_t readStartTime = 0;
+static bool codefree_writePending = false;
 
 /* ---------------------------------------------
  * Private Function prototypes
@@ -157,13 +158,17 @@ bool codefree_comm_checkReadCrc(CodefreeCommReadMessage_t *msg) {
 }
 
 void codefree_comm_handleRxComplete(void) {
-  if (readInterfaceApplication != NULL) {
+  if (readInterfaceApplication != NULL &&
+      codefree_comm_getStatus() == CODEFREE_COMM_STATUS_RECEIVING) {
     readInterfaceIO = codefree_comm_getReadInterfaceIO();
     memcpy(&readInterfaceApplication->payload.raw[0],
            &readInterfaceIO.payload.raw[0], 8);
     readInterfaceApplication->crcCorrect =
         codefree_comm_checkReadCrc(readInterfaceApplication);
     codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
+    if (codefree_writePending) {
+      codefree_comm_startWriteTransmit();
+    }
 
     if (codefree_comm_appCallback != NULL) {
       codefree_comm_appCallback(readInterfaceApplication,
@@ -173,11 +178,17 @@ void codefree_comm_handleRxComplete(void) {
 }
 
 void codefree_comm_backgroundHandler(void) {
-  if (codefree_comm_getStatus() == CODEFREE_COMM_STATUS_SENDING_READ) {
+  CodefreeCommStatus_t status = codefree_comm_getStatus();
+  /* reset if stuck in sending read or receiving */
+  if ((status == CODEFREE_COMM_STATUS_SENDING_READ) ||
+      (status == CODEFREE_COMM_STATUS_RECEIVING)) {
     if ((codefree_comm_ext_getTimeMs() - readStartTime) >=
         CODEFREE_COMM_RECEIVE_TIMEOUT_MS) {
       /* Timeout occurred! */
       codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
+      if (codefree_writePending) {
+        codefree_comm_startWriteTransmit();
+      }
     }
   }
 }
@@ -219,10 +230,13 @@ static void codefree_comm_clearWriteData(CodefreeCommWriteMessage_t *msg) {
 static void codefree_comm_startWriteTransmit(void) {
   codefree_comm_calcWriteCrc(&writeInterface);
   if (codefree_comm_getStatus() == CODEFREE_COMM_STATUS_IDLE) {
+    codefree_writePending = false;
     codefree_comm_setStatus(CODEFREE_COMM_STATUS_SENDING_WRITE);
     if (!codefree_comm_ext_sendWriteMessage(&writeInterface)) {
       codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
     }
+  } else {
+    codefree_writePending = true;
   }
 }
 
