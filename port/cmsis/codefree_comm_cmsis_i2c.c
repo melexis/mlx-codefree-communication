@@ -71,12 +71,12 @@ bool codefree_comm_ext_initDriver(void) {
   /* 2. CMSIS Initialization */
   retVal = (i2cDrv->Initialize(codefree_comm_ext_callback) == ARM_DRIVER_OK);
   if (retVal) {
-    retVal = (i2cDrv->PowerControl(ARM_POWER_FULL) == ARM_DRIVER_OK);
+    retVal = (i2cDrv->Control(ARM_I2C_BUS_SPEED, CODEFREE_COMM_I2C_BUS_SPEED) ==
+              ARM_DRIVER_OK);
   }
 
   if (retVal) {
-    retVal = (i2cDrv->Control(ARM_I2C_BUS_SPEED, CODEFREE_COMM_I2C_BUS_SPEED) ==
-              ARM_DRIVER_OK);
+    retVal = (i2cDrv->PowerControl(ARM_POWER_FULL) == ARM_DRIVER_OK);
   }
 
   return retVal;
