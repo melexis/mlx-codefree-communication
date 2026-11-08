@@ -126,6 +126,12 @@ bool codefree_comm_ext_sendReadRequest(
   return retVal;
 }
 
+void codefree_comm_ext_abortTransfer(void) {
+  ARM_DRIVER_I2C *i2cDrv = &ARM_Driver_I2C_(CODEFREE_COMM_I2C_DRIVER_INSTANCE);
+
+  (void)i2cDrv->Control(ARM_I2C_ABORT_TRANSFER, 0);
+}
+
 /* ----------------------------------------------------------------------------
  * Local function implementation
  * ------------------------------------------------------------------------- */
