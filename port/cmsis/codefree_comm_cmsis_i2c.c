@@ -135,7 +135,13 @@ static inline void codefree_comm_ext_callback(uint32_t event) {
 
   /* 1. Transfer successfully finished (both TX and RX complete trigger this in
    * I2C) */
-  if (event & ARM_I2C_EVENT_TRANSFER_DONE) {
+  /* CMSIS-Driver I2C: TRANSFER_INCOMPLETE is only valid together with
+   * TRANSFER_DONE (transfer ended before all bytes were transferred). Ignore it
+   * when it comes alone, so a progress event does not abort a running read. */
+  bool incomplete = ((event & ARM_I2C_EVENT_TRANSFER_INCOMPLETE) != 0u) &&
+                    ((event & ARM_I2C_EVENT_TRANSFER_DONE) != 0u);
+
+  if ((event & ARM_I2C_EVENT_TRANSFER_DONE) && !incomplete) {
     if (codefree_comm_getStatus() == CODEFREE_COMM_STATUS_SENDING_READ) {
       codefree_comm_handleRxComplete();
       /* Note: Ensure handleRxComplete updates the status to IDLE or appropriate
@@ -147,11 +153,10 @@ static inline void codefree_comm_ext_callback(uint32_t event) {
   }
 
   /* 2. Error Detection */
-  uint32_t errorMask = ARM_I2C_EVENT_TRANSFER_INCOMPLETE |
-                       ARM_I2C_EVENT_ADDRESS_NACK |
+  uint32_t errorMask = ARM_I2C_EVENT_ADDRESS_NACK |
                        ARM_I2C_EVENT_ARBITRATION_LOST | ARM_I2C_EVENT_BUS_ERROR;
 
-  if ((event & errorMask) != 0) {
+  if (((event & errorMask) != 0) || incomplete) {
     /** Abort the current transfer and reset state */
     i2cDrv->Control(ARM_I2C_ABORT_TRANSFER, 0);
     codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
