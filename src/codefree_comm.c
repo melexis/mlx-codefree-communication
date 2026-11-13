@@ -332,8 +332,9 @@ static void codefree_comm_processPending(void) {
 
 static bool codefree_comm_frameGapElapsed(void) {
 #if (CODEFREE_COMM_MIN_FRAME_GAP_MS > 0)
-  return !frameEndValid || ((codefree_comm_ext_getTimeMs() - lastFrameEndTime) >=
-                            CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  return !frameEndValid ||
+         ((codefree_comm_ext_getTimeMs() - lastFrameEndTime) >=
+          CODEFREE_COMM_MIN_FRAME_GAP_MS);
 #else
   return true;
 #endif
