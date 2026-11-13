@@ -297,12 +297,19 @@ static void codefree_comm_processPending(void) {
   }
 
   bool sendRead = readPending && (!writePending || lastSentWasWrite);
+  bool prevLastSentWasWrite = lastSentWasWrite;
 
+  /* If the port rejects a frame (e.g. the driver is still busy finishing an
+   * aborted transfer), the frame stays pending and is retried after the gap:
+   * going back to IDLE marks a frame end. A write is not lost, and an accepted
+   * read still ends with READ_COMPLETE or TIMEOUT. */
   if (writePending && !sendRead) {
     writePending = false;
     lastSentWasWrite = true;
     codefree_comm_setStatus(CODEFREE_COMM_STATUS_SENDING_WRITE);
     if (!codefree_comm_ext_sendWriteMessage(&writeInterface)) {
+      writePending = true;
+      lastSentWasWrite = prevLastSentWasWrite;
       codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
     }
   } else if (sendRead) {
@@ -313,8 +320,9 @@ static void codefree_comm_processPending(void) {
     codefree_comm_setStatus(CODEFREE_COMM_STATUS_SENDING_READ);
     readStartTime = codefree_comm_ext_getTimeMs();
 
-    /* If the hardware driver rejected the request, revert the state machine. */
     if (!codefree_comm_ext_sendReadRequest(&readInterfaceIO)) {
+      readPending = true;
+      lastSentWasWrite = prevLastSentWasWrite;
       codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
     }
   } else {
