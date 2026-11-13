@@ -2,8 +2,11 @@
 #include "mock_codefree_comm_external.h"
 #include "unity.h"
 
-void dummy_app_callback(CodefreeCommReadMessage_t *msg) {
+void dummy_app_callback(CodefreeCommReadMessage_t *msg,
+                        CodefreeCommEvent_t event) {
   /* Do nothing for now */
+  (void)msg;
+  (void)event;
 }
 
 void setUp(void) {}

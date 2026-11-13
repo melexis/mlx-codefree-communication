@@ -44,7 +44,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ruby
-          sudo gem install ceedling
+          # Same version as :ceedling_version in project.yml. No documentation:
+          # RDoc of Ruby 3.3 crashes on the Ceedling sources and fails the step.
+          sudo gem install ceedling -v 1.0.1 --no-document
 
       # 3. Run tests
       - name: Run Unit Tests
