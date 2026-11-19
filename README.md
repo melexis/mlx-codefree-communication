@@ -34,10 +34,10 @@ To successfully integrate and utilize this library in your project, consider the
 
 7.  **Frame scheduling and inter-frame gap:**
     Commands are never dropped. If the bus is busy or the minimum inter-frame gap has not elapsed, one write (the latest command wins) and one read are kept pending and sent from the background handler. When both are pending they alternate, so neither can starve the other. `codefree_comm_executeRead()` returns `true` when the read is accepted (sent or pending); the result is always reported via the application callback.
-    The MLX80339 needs idle time between frames: a read that directly follows a write gets a response whose CRC is computed over the write address byte, so the CRC check fails. `CODEFREE_COMM_MIN_FRAME_GAP_MS` (default 2, giving 1..2 ms with a 1 ms time base) prevents this.
+    The MLX80339 needs idle time between frames: a read that directly follows a write gets a response whose CRC is computed over the write address byte, so the CRC check fails. `CODEFREE_COMM_MIN_FRAME_GAP_MS` prevents this. It is a guaranteed minimum: with the 1 ms time base the real gap is N..N+1 ms. The default 1 (1..2 ms) is more than 4 times what the chip needs (measured over I2C with the motor running: errors up to ~205 us bus idle, none from ~225 us).
 
 8.  **Timeouts:**
-    `CODEFREE_COMM_RECEIVE_TIMEOUT_MS` must be longer than one read frame plus latency (I2C 100 kHz: ~1 ms, UART 9600 baud: ~10 ms). On timeout the library calls `codefree_comm_ext_abortTransfer()` and then the application callback with `CODEFREE_COMM_EVENT_TIMEOUT`.
+    `CODEFREE_COMM_RECEIVE_TIMEOUT_MS` must be longer than one read frame plus latency (I2C 100 kHz: ~1 ms, UART 9600 baud: ~10 ms). It is also a guaranteed minimum: the timeout fires after N..N+1 ms. On timeout the library calls `codefree_comm_ext_abortTransfer()` and then the application callback with `CODEFREE_COMM_EVENT_TIMEOUT`.
 
 ## Porting
 

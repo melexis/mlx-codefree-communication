@@ -29,13 +29,15 @@
 /** Common configuration */
 /** Slave response timeout [ms], measured from the start of the read request.
  * Must be longer than one read frame plus latency, e.g. I2C 100 kHz: ~1 ms,
- * UART 9600 baud: ~10 ms. The time base has 1 ms resolution. */
+ * UART 9600 baud: ~10 ms. Guaranteed minimum: the timeout fires after
+ * N..N+1 ms (1 ms time base). */
 #define CODEFREE_COMM_RECEIVE_TIMEOUT_MS 10
 
-/** Minimum idle time between two frames [ms]. A read that directly follows a
- * write gets a response with a wrong CRC from the MLX80339. The effective gap
- * is (N-1)..N ms because of the 1 ms time base. 0 disables the gap. */
-#define CODEFREE_COMM_MIN_FRAME_GAP_MS 2
+/** Minimum idle time between two frames [ms]. A read that follows a write too
+ * quickly gets a response with a wrong CRC from the MLX80339 (measured: needs
+ * ~225 us bus idle). Guaranteed minimum: the real gap is N..N+1 ms (1 ms time
+ * base). 0 disables the gap. */
+#define CODEFREE_COMM_MIN_FRAME_GAP_MS 1
 
 /** UART configuration */
 /** USART driver instance, used by CMSIS uart driver */

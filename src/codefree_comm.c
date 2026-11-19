@@ -42,17 +42,23 @@
  * Configuration defaults
  * --------------------------------------------- */
 
+/* Both times below are guaranteed minimums. The time base
+ * codefree_comm_ext_getTimeMs() has 1 ms resolution, so an interval of
+ * N ms is only certain once the counter has advanced by N + 1: the real time
+ * is N..N+1 ms (plus the background handler call period). */
+
+/* Slave response timeout [ms], measured from the start of the read request. */
 #ifndef CODEFREE_COMM_RECEIVE_TIMEOUT_MS
 #define CODEFREE_COMM_RECEIVE_TIMEOUT_MS 10u
 #endif
 
-/* Minimum idle time between the end of one frame and the start of the next.
- * The MLX80339 computes the CRC of a read response over the previous (write)
- * address byte when a read follows a write too quickly. Measured: back-to-back
- * fails, >= 1 ms works. Time base is codefree_comm_ext_getTimeMs(), so the
- * effective gap is (N-1)..N ms. Set to 0 to disable. */
+/* Minimum idle time [ms] between the end of one frame and the start of the
+ * next. The MLX80339 computes the CRC of a read response over the previous
+ * (write) address byte, or changes the payload after computing the CRC, when
+ * a read follows a write too quickly. Measured (I2C, motor running): errors up
+ * to ~205 us bus idle, none from ~225 us. Set to 0 to disable. */
 #ifndef CODEFREE_COMM_MIN_FRAME_GAP_MS
-#define CODEFREE_COMM_MIN_FRAME_GAP_MS 2u
+#define CODEFREE_COMM_MIN_FRAME_GAP_MS 1u
 #endif
 
 /* ---------------------------------------------
@@ -228,7 +234,7 @@ void codefree_comm_backgroundHandler(void) {
   /* Response timeout: covers both the request phase (SENDING_READ) and the
    * receive phase (RECEIVING, used by the UART port). */
   if (codefree_comm_readInProgress()) {
-    if ((codefree_comm_ext_getTimeMs() - readStartTime) >=
+    if ((codefree_comm_ext_getTimeMs() - readStartTime) >
         CODEFREE_COMM_RECEIVE_TIMEOUT_MS) {
       codefree_comm_ext_abortTransfer();
       codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
@@ -334,9 +340,8 @@ static void codefree_comm_processPending(void) {
 
 static bool codefree_comm_frameGapElapsed(void) {
 #if (CODEFREE_COMM_MIN_FRAME_GAP_MS > 0)
-  return !frameEndValid ||
-         ((codefree_comm_ext_getTimeMs() - lastFrameEndTime) >=
-          CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  return !frameEndValid || ((codefree_comm_ext_getTimeMs() - lastFrameEndTime) >
+                            CODEFREE_COMM_MIN_FRAME_GAP_MS);
 #else
   return true;
 #endif

@@ -15,13 +15,19 @@
  * - async port: a transfer completes later, when the test calls
  *   port_completeWrite() / port_completeRead() (like a driver interrupt)
  * - the next send calls can be rejected (port returns false)
- * - the fake chip reproduces the MLX80339 quirk: a read that starts in the
- *   same millisecond as the end of a write gets a response whose CRC is
- *   computed over the write address byte
+ * - the fake chip reproduces the MLX80339 quirk: a read that may start less
+ *   than ~0.25 ms after the end of a write (counter advanced by less than 2)
+ *   gets a response whose CRC is computed over the write address byte
  * ------------------------------------------------------------------------- */
 
 #define SLAVE_ADDR 0x7Eu
 #define MAX_LOGGED_WRITES 16u
+
+/* The gap and the timeout are guaranteed minimums. With the 1 ms fake time
+ * base an interval of N ms is only certain once the counter has advanced by
+ * N + 1, so that is when a pending frame is sent / the timeout fires. */
+#define GAP_TICKS (CODEFREE_COMM_MIN_FRAME_GAP_MS + 1u)
+#define TIMEOUT_TICKS (CODEFREE_COMM_RECEIVE_TIMEOUT_MS + 1u)
 
 /* Status frames captured from an MLX80339 at 0x7E (relative speed command) */
 static const uint8_t FRAME_OK[8] = {0x34, 0x00, 0x22, 0xD2,
@@ -105,7 +111,10 @@ static bool fake_sendReadRequest(CodefreeCommReadMessage_t *msg,
   lastReadTimeMs = fakeTimeMs;
   nReads++;
   if (portBlocking) {
-    bool tooSoon = writeEnded && (fakeTimeMs == lastWriteEndMs);
+    /* The write ended somewhere in tick lastWriteEndMs, the read starts at
+     * tick fakeTimeMs: the real idle time can be as short as
+     * (fakeTimeMs - lastWriteEndMs - 1) ms. The chip needs ~0.25 ms. */
+    bool tooSoon = writeEnded && ((fakeTimeMs - lastWriteEndMs) < 2u);
     memcpy(msg->readResponse,
            tooSoon ? FRAME_CRC_OVER_WRITE_ADDR : nextResponse, 8);
     codefree_comm_handleRxComplete();
@@ -358,7 +367,7 @@ void test_readAfterWrite_should_WaitForMinFrameGap(void) {
   TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg)); /* accepted */
   TEST_ASSERT_EQUAL_UINT32(0u, nReads);                     /* not sent */
 
-  runMs(CODEFREE_COMM_MIN_FRAME_GAP_MS - 1u);
+  runMs(GAP_TICKS - 1u); /* N ms not yet certain */
   TEST_ASSERT_EQUAL_UINT32(0u, nReads);
 
   runMs(1u);
@@ -376,18 +385,17 @@ void test_minFrameGap_should_BeMeasuredFromEndOfFrame(void) {
 
   port_completeWrite();
   uint32_t frameEndMs = fakeTimeMs;
-  runMs(CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  runMs(GAP_TICKS);
 
   TEST_ASSERT_EQUAL_UINT32(1u, nReads);
-  TEST_ASSERT_EQUAL_UINT32(frameEndMs + CODEFREE_COMM_MIN_FRAME_GAP_MS,
-                           lastReadTimeMs);
+  TEST_ASSERT_EQUAL_UINT32(frameEndMs + GAP_TICKS, lastReadTimeMs);
 }
 
 void test_setStatusIdleWhileIdle_should_NotRestartGap(void) {
   fakePort_init(true);
 
   codefree_comm_SetSpeedRelative(SLAVE_ADDR, 1u);
-  runMs(CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  runMs(GAP_TICKS);
   codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE); /* no frame ended */
 
   codefree_comm_SetSpeedRelative(SLAVE_ADDR, 2u);
@@ -408,7 +416,7 @@ void test_writeDuringRead_should_StayPending_AndLatestWins(void) {
   TEST_ASSERT_EQUAL_UINT32(0u, nWrites);
 
   port_completeRead(FRAME_OK);
-  runMs(CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  runMs(GAP_TICKS);
 
   TEST_ASSERT_EQUAL_UINT32(1u, nWrites);
   TEST_ASSERT_EQUAL_HEX8(20u, writeLog[0].data[0]);
@@ -424,19 +432,19 @@ void test_pendingWriteAndRead_should_Alternate(void) {
   port_completeRead(FRAME_OK);
   codefree_comm_SetSpeedRelative(SLAVE_ADDR, 5u);
   TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg));
-  runMs(CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  runMs(GAP_TICKS);
   TEST_ASSERT_EQUAL_UINT32(1u, nWrites);
   TEST_ASSERT_EQUAL_UINT32(1u, nReads);
 
   /* Last frame was a write -> the pending read goes first */
   codefree_comm_SetSpeedRelative(SLAVE_ADDR, 6u);
   port_completeWrite();
-  runMs(CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  runMs(GAP_TICKS);
   TEST_ASSERT_EQUAL_UINT32(2u, nReads);
   TEST_ASSERT_EQUAL_UINT32(1u, nWrites);
 
   port_completeRead(FRAME_OK);
-  runMs(CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  runMs(GAP_TICKS);
   TEST_ASSERT_EQUAL_UINT32(2u, nWrites);
   TEST_ASSERT_EQUAL_HEX8(6u, writeLog[1].data[0]);
 }
@@ -490,7 +498,7 @@ void test_timeout_should_AbortAndReportTimeout(void) {
   fakePort_init(false);
 
   TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg)); /* no answer */
-  runMs(CODEFREE_COMM_RECEIVE_TIMEOUT_MS - 1u);
+  runMs(TIMEOUT_TICKS - 1u); /* N ms not yet certain */
   TEST_ASSERT_EQUAL_UINT32(0u, nCbTimeout);
   TEST_ASSERT_EQUAL_UINT32(0u, nAborts);
 
@@ -508,7 +516,7 @@ void test_timeout_should_AlsoCoverReceivingState(void) {
 
   TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg));
   codefree_comm_setStatus(CODEFREE_COMM_STATUS_RECEIVING);
-  runMs(CODEFREE_COMM_RECEIVE_TIMEOUT_MS);
+  runMs(TIMEOUT_TICKS);
 
   TEST_ASSERT_EQUAL_UINT32(1u, nAborts);
   TEST_ASSERT_EQUAL_UINT32(1u, nCbTimeout);
@@ -519,14 +527,14 @@ void test_lateResponseAfterTimeout_should_BeIgnored(void) {
   fakePort_init(false);
 
   TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg));
-  runMs(CODEFREE_COMM_RECEIVE_TIMEOUT_MS);
+  runMs(TIMEOUT_TICKS);
   TEST_ASSERT_EQUAL_UINT32(1u, nCbTimeout);
 
   port_completeRead(FRAME_OK); /* arrives too late */
   TEST_ASSERT_EQUAL_UINT32(0u, nCbReadComplete);
 
   /* The library is usable again */
-  runMs(CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  runMs(GAP_TICKS);
   TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg));
   TEST_ASSERT_EQUAL_UINT32(2u, nReads);
 }
@@ -544,7 +552,7 @@ void test_rejectedWrite_should_StayPending_AndBeRetriedAfterGap(void) {
   TEST_ASSERT_EQUAL_UINT32(0u, nWrites);
   TEST_ASSERT_TRUE(codefree_comm_isWritePending());
 
-  runMs(CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  runMs(GAP_TICKS);
   TEST_ASSERT_EQUAL_UINT32(1u, nWrites);
   TEST_ASSERT_EQUAL_HEX8(42u, writeLog[0].data[0]);
   TEST_ASSERT_FALSE(codefree_comm_isWritePending());
@@ -558,7 +566,7 @@ void test_rejectedRead_should_StayPending_AndComplete(void) {
   TEST_ASSERT_EQUAL_UINT32(1u, nReadRejects);
   TEST_ASSERT_EQUAL_UINT32(0u, nCbReadComplete);
 
-  runMs(CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  runMs(GAP_TICKS);
   TEST_ASSERT_EQUAL_UINT32(1u, nReads);
   TEST_ASSERT_EQUAL_UINT32(1u, nCbCrcOk);
   TEST_ASSERT_EQUAL_UINT32(0u, nCbTimeout);
@@ -577,6 +585,6 @@ void test_commandsToDifferentSlaves_should_AllBeSent(void) {
   codefree_comm_SetSpeedRelative(0x7Du, 10u);
   codefree_comm_SetSpeedRelative(0x7Eu, 20u);
   port_completeRead(FRAME_OK);
-  runMs(10u * CODEFREE_COMM_MIN_FRAME_GAP_MS);
+  runMs(10u * GAP_TICKS);
   TEST_ASSERT_EQUAL_UINT32(2u, nWrites);
 }
