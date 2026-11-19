@@ -96,6 +96,8 @@ bool codefree_comm_init(CodefreeComm_ReadCallback_t appCallback) {
   readPending = false;
   frameEndValid = false;
   lastSentWasWrite = false;
+  /* Inactive until the driver is up: a failed re-init must not keep IDLE. */
+  codefree_commStatus = CODEFREE_COMM_STATUS_INACTIVE;
   retVal = codefree_comm_ext_initDriver();
   if (retVal) {
     codefree_commStatus = CODEFREE_COMM_STATUS_IDLE;
