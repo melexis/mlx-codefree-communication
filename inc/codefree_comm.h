@@ -151,7 +151,12 @@ typedef void (*CodefreeComm_ReadCallback_t)(CodefreeCommReadMessage_t *msg,
  */
 bool codefree_comm_init(CodefreeComm_ReadCallback_t appCallback);
 
-/* Motor Control Commands */
+/* Motor Control Commands
+ *
+ * The Set* functions do not fail: the command is sent immediately when the bus
+ * is idle and the minimum inter-frame gap has elapsed, otherwise it is kept
+ * pending and sent from codefree_comm_backgroundHandler(). A newer command
+ * replaces a pending (not yet sent) one. */
 
 /** Sets a relative speed target for the specified slave.
  *
@@ -200,7 +205,15 @@ void codefree_comm_SetActiveCommand(
  * @note the slave address in the data structure needs to be set to the slave
  * address you want to read.
  * @note by default, the amount of bytes read is 8.
- * @return bool true if read was succesfully sent, false otherwise
+ * @note the request is sent immediately when possible, otherwise it is kept
+ * pending (e.g. behind a pending write or the inter-frame gap) and sent from
+ * codefree_comm_backgroundHandler(). The result is reported via the
+ * application callback (READ_COMPLETE or TIMEOUT).
+ * @note readMsgStruct is filled in later (when the response arrives), so it
+ * must stay valid until the callback: use a static or global structure, not a
+ * local variable.
+ * @return bool true if the read was accepted (sent or pending), false if the
+ * module is not initialized or a read is already pending / in progress
  */
 bool codefree_comm_executeRead(CodefreeCommReadMessage_t *readMsgStruct);
 
@@ -216,13 +229,31 @@ bool codefree_comm_checkReadCrc(CodefreeCommReadMessage_t *msg);
  * This function copies the received data in to the application-provided read
  * buffer. It also executes the checkCrc, and executes the application-provided
  * function.
+ * @note Called by the port while the read is still in progress: the port must
+ * not set the status to IDLE before calling it, otherwise the completion is
+ * ignored (it is treated as a late response after a timeout).
  */
 void codefree_comm_handleRxComplete(void);
 
 /** Communication block background handler
- * Check for timeout on slave response.
+ * - Checks for timeout on the slave response: aborts the transfer and calls
+ *   the application callback with CODEFREE_COMM_EVENT_TIMEOUT.
+ * - Sends pending frames once the bus is idle and the gap has elapsed.
+ * @note must be called periodically (e.g. every main loop iteration or 1 ms).
  */
 void codefree_comm_backgroundHandler(void);
+
+/** Check whether a write command is still waiting to be sent.
+ * @return bool true if a write is pending
+ */
+bool codefree_comm_isWritePending(void);
+
+/** Set the communication status (used by the port implementations).
+ * A transition from a busy state to IDLE marks the end of a frame, which is
+ * the reference point for the minimum inter-frame gap.
+ * @param status new status
+ */
+void codefree_comm_setStatus(CodefreeCommStatus_t status);
 
 /* ---------------------------------------------
  * Inline functions
@@ -233,13 +264,8 @@ static inline CodefreeCommReadMessage_t codefree_comm_getReadInterfaceIO(void) {
   return readInterfaceIO;
 }
 
-static inline void codefree_comm_setStatus(CodefreeCommStatus_t status) {
-  extern CodefreeCommStatus_t codefree_commStatus;
-  codefree_commStatus = status;
-}
-
 static inline CodefreeCommStatus_t codefree_comm_getStatus(void) {
-  extern CodefreeCommStatus_t codefree_commStatus;
+  extern volatile CodefreeCommStatus_t codefree_commStatus;
   return codefree_commStatus;
 }
 

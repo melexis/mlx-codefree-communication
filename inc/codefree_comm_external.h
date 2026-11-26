@@ -74,4 +74,16 @@ bool codefree_comm_ext_sendWriteMessage(CodefreeCommWriteMessage_t *msg);
 bool codefree_comm_ext_sendReadRequest(
     CodefreeCommReadMessage_t *readMsgStruct);
 
+/**
+ * Abort an ongoing transfer.
+ *
+ * Called by the library when the slave did not respond in time
+ * (CODEFREE_COMM_RECEIVE_TIMEOUT_MS), so that a late response cannot complete
+ * the aborted transfer. The library sets its status back to IDLE afterwards.
+ * After this function returns, the port must not report the aborted transfer
+ * as complete (codefree_comm_handleRxComplete()).
+ * Also called when the port keeps rejecting a read until the timeout.
+ */
+void codefree_comm_ext_abortTransfer(void);
+
 #endif /* CODEFREE_COMM_EXTERNAL_H_ */

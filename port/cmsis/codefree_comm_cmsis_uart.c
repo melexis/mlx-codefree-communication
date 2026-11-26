@@ -40,7 +40,7 @@
 
 /* Define default driver instance if not provided by build system */
 #ifndef CODEFREE_COMM_USART_DRIVER_INSTANCE
-#error "define a CODEFREE_COMM_USART_DRIVER_INSTANCE for the mlx codefree communication block."
+#error "Define CODEFREE_COMM_USART_DRIVER_INSTANCE in codefree_comm_config.h"
 #endif
 
 extern ARM_DRIVER_USART ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
@@ -145,6 +145,16 @@ bool codefree_comm_ext_sendReadRequest(
   }
 
   return retVal;
+}
+
+void codefree_comm_ext_abortTransfer(void) {
+  ARM_DRIVER_USART *usartDrv =
+      &ARM_Driver_USART_(CODEFREE_COMM_USART_DRIVER_INSTANCE);
+
+  (void)usartDrv->Control(ARM_USART_ABORT_SEND, 0);
+  (void)usartDrv->Control(ARM_USART_ABORT_RECEIVE, 0);
+  (void)usartDrv->Control(ARM_USART_CONTROL_RX, 0);
+  (void)usartDrv->Control(ARM_USART_CONTROL_RX, 1);
 }
 
 /* ----------------------------------------------------------------------------
