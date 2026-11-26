@@ -75,6 +75,10 @@ static uint32_t readStartTime = 0;
 
 static bool writePending = false;
 static bool readPending = false;
+/* readStartTime is set when the read is first offered to the port. Retries
+ * after a port rejection do not restart it, so a read that the port keeps
+ * rejecting also ends with TIMEOUT. */
+static bool readStarted = false;
 static bool lastSentWasWrite = false;
 static volatile bool frameEndValid = false;
 static volatile uint32_t lastFrameEndTime = 0;
@@ -187,6 +191,8 @@ bool codefree_comm_executeRead(CodefreeCommReadMessage_t *readMsgStruct) {
       (codefree_comm_getStatus() != CODEFREE_COMM_STATUS_INACTIVE) &&
       !readPending && !codefree_comm_readInProgress()) {
     readInterfaceApplication = readMsgStruct;
+    readStarted = false; /* before readPending: never pair it with an old
+                            start time */
     readPending = true;
     retVal = true;
     codefree_comm_processPending();
@@ -231,13 +237,27 @@ void codefree_comm_handleRxComplete(void) {
 }
 
 void codefree_comm_backgroundHandler(void) {
-  /* Response timeout: covers both the request phase (SENDING_READ) and the
-   * receive phase (RECEIVING, used by the UART port). */
-  if (codefree_comm_readInProgress()) {
-    if ((codefree_comm_ext_getTimeMs() - readStartTime) >
-        CODEFREE_COMM_RECEIVE_TIMEOUT_MS) {
-      codefree_comm_ext_abortTransfer();
+  /* Response timeout: covers the request phase (SENDING_READ), the receive
+   * phase (RECEIVING, used by the UART port) and a read that the port keeps
+   * rejecting (pending, already offered to the port). */
+  if ((codefree_comm_readInProgress() || (readPending && readStarted)) &&
+      ((codefree_comm_ext_getTimeMs() - readStartTime) >
+       CODEFREE_COMM_RECEIVE_TIMEOUT_MS)) {
+    codefree_comm_ext_abortTransfer();
+
+    /* The response may have completed (driver interrupt) between the check
+     * above and the abort: then it was already reported as READ_COMPLETE and
+     * must not also be reported as TIMEOUT. After the abort the port does not
+     * complete the transfer any more. */
+    if (codefree_comm_readInProgress() || (readPending && readStarted)) {
+      readPending = false;
+      lastSentWasWrite =
+          false; /* the read had its turn: a waiting write next */
       codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
+      /* The abort ends whatever was on the bus: start the gap here, also when
+       * the status was already IDLE (read rejected by the port). */
+      lastFrameEndTime = codefree_comm_ext_getTimeMs();
+      frameEndValid = true;
 
       if ((codefree_comm_appCallback != NULL) &&
           (readInterfaceApplication != NULL)) {
@@ -305,19 +325,20 @@ static void codefree_comm_processPending(void) {
   }
 
   bool sendRead = readPending && (!writePending || lastSentWasWrite);
-  bool prevLastSentWasWrite = lastSentWasWrite;
 
   /* If the port rejects a frame (e.g. the driver is still busy finishing an
    * aborted transfer), the frame stays pending and is retried after the gap:
-   * going back to IDLE marks a frame end. A write is not lost, and an accepted
-   * read still ends with READ_COMPLETE or TIMEOUT. */
+   * going back to IDLE marks a frame end. A write is not lost. After a
+   * rejection a pending read goes next and keeps its start time, so an accepted
+   * read still ends with READ_COMPLETE or, if the port keeps rejecting, with
+   * TIMEOUT (also when a write was ahead of it). */
   if (writePending && !sendRead) {
     writePending = false;
     lastSentWasWrite = true;
     codefree_comm_setStatus(CODEFREE_COMM_STATUS_SENDING_WRITE);
     if (!codefree_comm_ext_sendWriteMessage(&writeInterface)) {
       writePending = true;
-      lastSentWasWrite = prevLastSentWasWrite;
+      lastSentWasWrite = true; /* a pending read goes next */
       codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
     }
   } else if (sendRead) {
@@ -325,12 +346,17 @@ static void codefree_comm_processPending(void) {
     lastSentWasWrite = false;
     readInterfaceIO.slaveAddress = readInterfaceApplication->slaveAddress;
     readInterfaceIO.crcCorrect = false;
+    /* Start time before the status: a timeout check must never see
+     * SENDING_READ together with the start time of the previous read. */
+    if (!readStarted) {
+      readStartTime = codefree_comm_ext_getTimeMs();
+      readStarted = true;
+    }
     codefree_comm_setStatus(CODEFREE_COMM_STATUS_SENDING_READ);
-    readStartTime = codefree_comm_ext_getTimeMs();
 
     if (!codefree_comm_ext_sendReadRequest(&readInterfaceIO)) {
       readPending = true;
-      lastSentWasWrite = prevLastSentWasWrite;
+      lastSentWasWrite = true; /* the read goes next again */
       codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE);
     }
   } else {

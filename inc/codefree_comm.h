@@ -209,6 +209,9 @@ void codefree_comm_SetActiveCommand(
  * pending (e.g. behind a pending write or the inter-frame gap) and sent from
  * codefree_comm_backgroundHandler(). The result is reported via the
  * application callback (READ_COMPLETE or TIMEOUT).
+ * @note readMsgStruct is filled in later (when the response arrives), so it
+ * must stay valid until the callback: use a static or global structure, not a
+ * local variable.
  * @return bool true if the read was accepted (sent or pending), false if the
  * module is not initialized or a read is already pending / in progress
  */
@@ -226,6 +229,9 @@ bool codefree_comm_checkReadCrc(CodefreeCommReadMessage_t *msg);
  * This function copies the received data in to the application-provided read
  * buffer. It also executes the checkCrc, and executes the application-provided
  * function.
+ * @note Called by the port while the read is still in progress: the port must
+ * not set the status to IDLE before calling it, otherwise the completion is
+ * ignored (it is treated as a late response after a timeout).
  */
 void codefree_comm_handleRxComplete(void);
 

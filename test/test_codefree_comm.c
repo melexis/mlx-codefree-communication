@@ -15,9 +15,10 @@
  * - async port: a transfer completes later, when the test calls
  *   port_completeWrite() / port_completeRead() (like a driver interrupt)
  * - the next send calls can be rejected (port returns false)
- * - the fake chip reproduces the MLX80339 quirk: a read that may start less
- *   than ~0.25 ms after the end of a write (counter advanced by less than 2)
- *   gets a response whose CRC is computed over the write address byte
+ * - the fake chip reproduces the MLX80339 quirk (blocking and async): a read
+ *   that may start less than ~0.25 ms after the end of a write (counter
+ *   advanced by less than 2) gets a response whose CRC is computed over the
+ *   write address byte
  * ------------------------------------------------------------------------- */
 
 #define SLAVE_ADDR 0x7Eu
@@ -42,6 +43,7 @@ static bool initDriverResult;
 static bool portBlocking;
 static uint32_t rejectNextWrites;
 static uint32_t rejectNextReads;
+static bool completeOnAbort;
 static const uint8_t *nextResponse;
 
 static uint32_t nWrites;
@@ -73,9 +75,28 @@ static bool fake_initDriver(int cmock_num_calls) {
   return initDriverResult;
 }
 
+/* Response bytes the fake chip returns for a read that started at
+ * readStartMs: the MLX80339 quirk when the read may follow a write by about
+ * 0 ms (the write ended in tick lastWriteEndMs, the read starts at tick
+ * readStartMs, so the real idle time can be as short as
+ * (readStartMs - lastWriteEndMs - 1) ms; the chip needs ~0.25 ms). */
+static const uint8_t *chipResponse(uint32_t readStartMs,
+                                   const uint8_t *response) {
+  bool tooSoon = writeEnded && ((readStartMs - lastWriteEndMs) < 2u);
+  return tooSoon ? FRAME_CRC_OVER_WRITE_ADDR : response;
+}
+
 static void fake_abortTransfer(int cmock_num_calls) {
   (void)cmock_num_calls;
   nAborts++;
+  if (completeOnAbort && (portReadBuffer != NULL)) {
+    /* The response completes (driver interrupt) just before the abort takes
+     * effect. */
+    completeOnAbort = false;
+    memcpy(portReadBuffer->readResponse, chipResponse(lastReadTimeMs, FRAME_OK),
+           8);
+    codefree_comm_handleRxComplete();
+  }
 }
 
 static bool fake_sendWriteMessage(CodefreeCommWriteMessage_t *msg,
@@ -111,12 +132,7 @@ static bool fake_sendReadRequest(CodefreeCommReadMessage_t *msg,
   lastReadTimeMs = fakeTimeMs;
   nReads++;
   if (portBlocking) {
-    /* The write ended somewhere in tick lastWriteEndMs, the read starts at
-     * tick fakeTimeMs: the real idle time can be as short as
-     * (fakeTimeMs - lastWriteEndMs - 1) ms. The chip needs ~0.25 ms. */
-    bool tooSoon = writeEnded && ((fakeTimeMs - lastWriteEndMs) < 2u);
-    memcpy(msg->readResponse,
-           tooSoon ? FRAME_CRC_OVER_WRITE_ADDR : nextResponse, 8);
+    memcpy(msg->readResponse, chipResponse(fakeTimeMs, nextResponse), 8);
     codefree_comm_handleRxComplete();
   }
   return true;
@@ -142,6 +158,7 @@ static void fakePort_init(bool blocking) {
   portBlocking = blocking;
   rejectNextWrites = 0u;
   rejectNextReads = 0u;
+  completeOnAbort = false;
   nextResponse = FRAME_OK;
   nWrites = nReads = nWriteRejects = nReadRejects = nAborts = 0u;
   writeEnded = false;
@@ -171,7 +188,8 @@ static void port_completeWrite(void) {
 /** Async port: the read on the bus completes with the given response. */
 static void port_completeRead(const uint8_t *response) {
   TEST_ASSERT_NOT_NULL(portReadBuffer);
-  memcpy(portReadBuffer->readResponse, response, 8);
+  memcpy(portReadBuffer->readResponse, chipResponse(lastReadTimeMs, response),
+         8);
   codefree_comm_handleRxComplete();
 }
 
@@ -416,9 +434,13 @@ void test_writeDuringRead_should_StayPending_AndLatestWins(void) {
   TEST_ASSERT_EQUAL_UINT32(0u, nWrites);
 
   port_completeRead(FRAME_OK);
-  runMs(GAP_TICKS);
+  uint32_t readEndMs = fakeTimeMs;
+  runMs(GAP_TICKS - 1u);
+  TEST_ASSERT_EQUAL_UINT32(0u, nWrites); /* gap after the read */
+  runMs(1u);
 
   TEST_ASSERT_EQUAL_UINT32(1u, nWrites);
+  TEST_ASSERT_EQUAL_UINT32(readEndMs + GAP_TICKS, writeTimeMs[0]);
   TEST_ASSERT_EQUAL_HEX8(20u, writeLog[0].data[0]);
   TEST_ASSERT_EQUAL_HEX8(expectedWriteCrc(&writeLog[0]), writeLog[0].crc);
   TEST_ASSERT_FALSE(codefree_comm_isWritePending());
@@ -447,6 +469,8 @@ void test_pendingWriteAndRead_should_Alternate(void) {
   runMs(GAP_TICKS);
   TEST_ASSERT_EQUAL_UINT32(2u, nWrites);
   TEST_ASSERT_EQUAL_HEX8(6u, writeLog[1].data[0]);
+  /* The fake chip returns a bad CRC for a read too soon after a write */
+  TEST_ASSERT_EQUAL_UINT32(2u, nCbCrcOk);
 }
 
 void test_reads_should_NotStarve_WhenWritesAreFasterThanGap(void) {
@@ -496,6 +520,7 @@ void test_rampScenario_should_DeliverEveryReadWithValidCrc(void) {
 
 void test_timeout_should_AbortAndReportTimeout(void) {
   fakePort_init(false);
+  appReadMsg.crcCorrect = true; /* from a previous read */
 
   TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg)); /* no answer */
   runMs(TIMEOUT_TICKS - 1u); /* N ms not yet certain */
@@ -523,6 +548,22 @@ void test_timeout_should_AlsoCoverReceivingState(void) {
   TEST_ASSERT_EQUAL(CODEFREE_COMM_STATUS_IDLE, codefree_comm_getStatus());
 }
 
+void test_responseCompletingAtTimeout_should_BeReportedOnlyOnce(void) {
+  /* The driver completes the read right when the timeout fires: only
+   * READ_COMPLETE may be reported, not also TIMEOUT. */
+  fakePort_init(false);
+
+  TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg));
+  completeOnAbort = true;
+  runMs(TIMEOUT_TICKS);
+
+  TEST_ASSERT_EQUAL_UINT32(1u, nAborts);
+  TEST_ASSERT_EQUAL_UINT32(1u, nCbReadComplete);
+  TEST_ASSERT_EQUAL_UINT32(0u, nCbTimeout);
+  TEST_ASSERT_TRUE(appReadMsg.crcCorrect);
+  TEST_ASSERT_EQUAL(CODEFREE_COMM_STATUS_IDLE, codefree_comm_getStatus());
+}
+
 void test_lateResponseAfterTimeout_should_BeIgnored(void) {
   fakePort_init(false);
 
@@ -547,13 +588,17 @@ void test_rejectedWrite_should_StayPending_AndBeRetriedAfterGap(void) {
   fakePort_init(true);
   rejectNextWrites = 1u;
 
+  uint32_t rejectMs = fakeTimeMs;
   codefree_comm_SetSpeedRelative(SLAVE_ADDR, 42u);
   TEST_ASSERT_EQUAL_UINT32(1u, nWriteRejects);
   TEST_ASSERT_EQUAL_UINT32(0u, nWrites);
   TEST_ASSERT_TRUE(codefree_comm_isWritePending());
 
-  runMs(GAP_TICKS);
+  runMs(GAP_TICKS - 1u);
+  TEST_ASSERT_EQUAL_UINT32(0u, nWrites); /* retried only after the gap */
+  runMs(1u);
   TEST_ASSERT_EQUAL_UINT32(1u, nWrites);
+  TEST_ASSERT_EQUAL_UINT32(rejectMs + GAP_TICKS, writeTimeMs[0]);
   TEST_ASSERT_EQUAL_HEX8(42u, writeLog[0].data[0]);
   TEST_ASSERT_FALSE(codefree_comm_isWritePending());
 }
@@ -562,14 +607,89 @@ void test_rejectedRead_should_StayPending_AndComplete(void) {
   fakePort_init(true);
   rejectNextReads = 1u;
 
+  uint32_t rejectMs = fakeTimeMs;
   TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg));
   TEST_ASSERT_EQUAL_UINT32(1u, nReadRejects);
   TEST_ASSERT_EQUAL_UINT32(0u, nCbReadComplete);
 
+  runMs(GAP_TICKS - 1u);
+  TEST_ASSERT_EQUAL_UINT32(0u, nReads); /* retried only after the gap */
+  runMs(1u);
+  TEST_ASSERT_EQUAL_UINT32(1u, nReads);
+  TEST_ASSERT_EQUAL_UINT32(rejectMs + GAP_TICKS, lastReadTimeMs);
+  TEST_ASSERT_EQUAL_UINT32(1u, nCbCrcOk);
+  TEST_ASSERT_EQUAL_UINT32(0u, nCbTimeout);
+}
+
+void test_readRejectedUntilTimeout_should_AbortAndReportTimeout(void) {
+  /* The port keeps rejecting the read (e.g. driver stuck busy): retries do not
+   * restart the timeout, so the read still ends with TIMEOUT. */
+  fakePort_init(true);
+  rejectNextReads = 1000u;
+  appReadMsg.crcCorrect = true; /* from a previous read */
+
+  TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg));
+  runMs(TIMEOUT_TICKS - 1u);
+  TEST_ASSERT_GREATER_THAN_UINT32(1u, nReadRejects); /* retried */
+  TEST_ASSERT_EQUAL_UINT32(0u, nCbTimeout);
+
+  runMs(1u);
+  TEST_ASSERT_EQUAL_UINT32(1u, nAborts);
+  TEST_ASSERT_EQUAL_UINT32(1u, nCbTimeout);
+  TEST_ASSERT_EQUAL_UINT32(0u, nReads);
+  TEST_ASSERT_FALSE(appReadMsg.crcCorrect);
+
+  /* The port works again: a new read is accepted and completes */
+  rejectNextReads = 0u;
+  runMs(GAP_TICKS);
+  TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg));
   runMs(GAP_TICKS);
   TEST_ASSERT_EQUAL_UINT32(1u, nReads);
   TEST_ASSERT_EQUAL_UINT32(1u, nCbCrcOk);
-  TEST_ASSERT_EQUAL_UINT32(0u, nCbTimeout);
+}
+
+void test_writeAndReadRejected_should_StillTimeOutTheRead(void) {
+  /* A write is ahead of the read and the port rejects everything: after the
+   * rejected write the read gets its turn, so it still ends with TIMEOUT. */
+  fakePort_init(true);
+  rejectNextWrites = 1000u;
+  rejectNextReads = 1000u;
+
+  codefree_comm_SetSpeedRelative(SLAVE_ADDR, 42u);
+  TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg));
+  runMs(GAP_TICKS + TIMEOUT_TICKS);
+
+  TEST_ASSERT_GREATER_THAN_UINT32(0u, nReadRejects);
+  TEST_ASSERT_EQUAL_UINT32(1u, nAborts);
+  TEST_ASSERT_EQUAL_UINT32(1u, nCbTimeout);
+  TEST_ASSERT_TRUE(codefree_comm_isWritePending()); /* write not lost */
+}
+
+void test_afterReadTimeout_should_KeepGap_AndSendWaitingWriteFirst(void) {
+  fakePort_init(true);
+  rejectNextReads = 1000u;
+
+  TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg)); /* rejected */
+  codefree_comm_SetSpeedRelative(SLAVE_ADDR, 7u); /* waits: read has turn */
+  runMs(TIMEOUT_TICKS);
+  TEST_ASSERT_EQUAL_UINT32(1u, nCbTimeout);
+  TEST_ASSERT_EQUAL_UINT32(0u, nWrites);
+  uint32_t abortMs = fakeTimeMs;
+
+  /* New read requested: the waiting write goes first, after a full gap
+   * counted from the abort */
+  rejectNextReads = 0u;
+  TEST_ASSERT_TRUE(codefree_comm_executeRead(&appReadMsg));
+  runMs(GAP_TICKS - 1u);
+  TEST_ASSERT_EQUAL_UINT32(0u, nWrites);
+  runMs(1u);
+  TEST_ASSERT_EQUAL_UINT32(1u, nWrites);
+  TEST_ASSERT_EQUAL_UINT32(abortMs + GAP_TICKS, writeTimeMs[0]);
+  TEST_ASSERT_EQUAL_UINT32(0u, nReads);
+
+  runMs(GAP_TICKS);
+  TEST_ASSERT_EQUAL_UINT32(1u, nReads);
+  TEST_ASSERT_EQUAL_UINT32(1u, nCbCrcOk);
 }
 
 /* ---------------------------------------------------------------------------

@@ -33,7 +33,7 @@ To successfully integrate and utilize this library in your project, consider the
     Call `codefree_comm_backgroundHandler()` periodically (every main loop iteration or at least every 1 ms). It handles the slave response timeout and sends pending frames.
 
 7.  **Frame scheduling and inter-frame gap:**
-    Commands are never dropped. If the bus is busy or the minimum inter-frame gap has not elapsed, one write (the latest command wins) and one read are kept pending and sent from the background handler. When both are pending they alternate, so neither can starve the other. `codefree_comm_executeRead()` returns `true` when the read is accepted (sent or pending); the result is always reported via the application callback.
+    Commands are never dropped. If the bus is busy or the minimum inter-frame gap has not elapsed, one write (the latest command wins) and one read are kept pending and sent from the background handler. When both are pending they alternate, so neither can starve the other. `codefree_comm_executeRead()` returns `true` when the read is accepted (sent or pending); the result is always reported via the application callback. The read structure is filled in later, so it must stay valid until the callback (static or global, not a local variable).
     The MLX80339 needs idle time between frames: a read that directly follows a write gets a response whose CRC is computed over the write address byte, so the CRC check fails. `CODEFREE_COMM_MIN_FRAME_GAP_MS` prevents this. It is a guaranteed minimum: with the 1 ms time base the real gap is N..N+1 ms. The default 1 (1..2 ms) is more than 4 times what the chip needs (measured over I2C with the motor running: errors up to ~205 us bus idle, none from ~225 us).
 
 8.  **Timeouts:**
@@ -50,6 +50,12 @@ A custom port implements these functions from `codefree_comm_external.h`:
 | `codefree_comm_ext_initDriver()` | Initialize the communication peripheral |
 | `codefree_comm_ext_sendWriteMessage()` | Send a write frame; copy the frame, the library may reuse its buffer |
 | `codefree_comm_ext_sendReadRequest()` | Start a read of 8 bytes into the given structure |
-| `codefree_comm_ext_abortTransfer()` | Abort an ongoing transfer (on response timeout) |
+| `codefree_comm_ext_abortTransfer()` | Abort an ongoing transfer (on response timeout). Afterwards the port must not complete it any more |
 
-On transfer completion or error the port calls `codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE)` (write) or `codefree_comm_handleRxComplete()` (read). Blocking ports may do this before returning from the send function.
+When a write ends (completed or failed), the port calls `codefree_comm_setStatus(CODEFREE_COMM_STATUS_IDLE)`. When a read completes successfully, the port calls `codefree_comm_handleRxComplete()` without setting the status to IDLE first: it sets IDLE itself, and a completion that arrives when the library is already IDLE is ignored as a late response. Blocking ports may do this before returning from the send function.
+
+When a read fails (NACK, bus error), the port must not call `codefree_comm_handleRxComplete()`: the receive buffer still holds the previous response, which would pass the CRC check. Leave the status unchanged instead; the library then ends the read with `abortTransfer()` and `CODEFREE_COMM_EVENT_TIMEOUT`. (The CMSIS ports currently set IDLE on a failed read, so that read ends without a callback: known limitation.)
+
+With interrupt-driven ports, `READ_COMPLETE` is reported from the driver interrupt and `TIMEOUT` from `codefree_comm_backgroundHandler()`. The library API is not interrupt safe: do not call library functions from the callback or from another interrupt; set a flag and act on it in the main loop. Call `codefree_comm_backgroundHandler()` from the main loop, not from an interrupt.
+
+A send function returns `false` only when nothing was sent (for example the driver is still busy): the library keeps the frame and retries it after the gap. A read that is still rejected after `CODEFREE_COMM_RECEIVE_TIMEOUT_MS` ends with `abortTransfer()` and `CODEFREE_COMM_EVENT_TIMEOUT`.
